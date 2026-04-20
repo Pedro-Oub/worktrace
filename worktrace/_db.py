@@ -8,6 +8,8 @@ from pathlib import Path
 
 _DB_PATH = Path.home() / ".worktrace" / "worktrace.db"
 
+_conn: sqlite3.Connection | None = None
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (
     id          TEXT PRIMARY KEY,
@@ -48,11 +50,14 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_resource   ON snapshots(resource_uri);
 
 
 def get_conn() -> sqlite3.Connection:
-    """Return a WAL-mode connection to the worktrace database."""
+    """Return a cached WAL-mode connection to the worktrace database."""
+    global _conn
+    if _conn is not None:
+        return _conn
     _DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(_DB_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    conn.executescript(_SCHEMA)
-    return conn
+    _conn = sqlite3.connect(_DB_PATH, check_same_thread=False)
+    _conn.row_factory = sqlite3.Row
+    _conn.execute("PRAGMA journal_mode=WAL")
+    _conn.execute("PRAGMA foreign_keys=ON")
+    _conn.executescript(_SCHEMA)
+    return _conn
